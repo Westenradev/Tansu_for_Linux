@@ -92,13 +92,14 @@ impl ShelfWindow {
 
     #[cfg(all(target_os = "linux", feature = "layer-shell"))]
     fn try_layer_shell(window: &libadwaita::ApplicationWindow) {
+        use gtk4_layer_shell::{Edge, Layer, LayerShell};
         if gtk4_layer_shell::is_supported() {
-            gtk4_layer_shell::init_for_window(window);
-            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Right, true);
-            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Top, true);
-            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Bottom, true);
-            gtk4_layer_shell::set_layer(window, gtk4_layer_shell::Layer::Top);
-            gtk4_layer_shell::auto_exclusive_zone_enable(window);
+            window.init_layer_shell();
+            window.set_anchor(Edge::Right, true);
+            window.set_anchor(Edge::Top, true);
+            window.set_anchor(Edge::Bottom, true);
+            window.set_layer(Layer::Top);
+            window.auto_exclusive_zone_enable();
         }
     }
 
