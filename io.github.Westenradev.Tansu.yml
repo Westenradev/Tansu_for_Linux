@@ -16,6 +16,9 @@ finish-args:
   - --share=ipc
   - --talk-name=org.freedesktop.Notifications
   - --filesystem=xdg-config/tansu:create
+  # Read-only access to the user's files: needed to preview and drag out
+  # shelved files. Tansu never writes to them.
+  - --filesystem=host:ro
 
 modules:
   - name: gtk4-layer-shell

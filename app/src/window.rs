@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -28,6 +28,10 @@ struct Ui {
     stack: gtk4::Stack,
     shelf: RefCell<Shelf>,
     monitors: RefCell<Vec<gio::FileMonitor>>,
+    /// Items of the drag that is in progress.
+    dragging: RefCell<Vec<ShelfItem>>,
+    /// Yoink-style: drop an item out of the shelf once it was dragged out.
+    remove_after_drag: Cell<bool>,
 }
 
 fn texture_item(tex: &gdk::Texture) -> Option<ShelfItem> {
@@ -45,6 +49,12 @@ fn drag_provider(items: &[ShelfItem]) -> Option<gdk::ContentProvider> {
         })
         .collect();
     if !files.is_empty() {
+        // Plain host-path URIs first, so file managers always get real paths.
+        let uris: String = files.iter().map(|f| format!("{}\r\n", f.uri())).collect();
+        provs.push(gdk::ContentProvider::for_bytes(
+            "text/uri-list",
+            &glib::Bytes::from_owned(uris.into_bytes()),
+        ));
         let list = gdk::FileList::from_array(&files);
         provs.push(gdk::ContentProvider::for_value(&list.to_value()));
     }
@@ -258,6 +268,18 @@ impl Ui {
             u.persist();
             u.refresh();
         });
+        let toggle = gio::SimpleAction::new_stateful(
+            "remove-after-drag",
+            None,
+            &self.remove_after_drag.get().to_variant(),
+        );
+        let ui = self.clone();
+        toggle.connect_activate(move |a, _| {
+            let on = !ui.remove_after_drag.get();
+            ui.remove_after_drag.set(on);
+            a.set_state(&on.to_variant());
+        });
+        self.window.add_action(&toggle);
         self.action("about", |u| {
             let dlg = adw::AboutDialog::builder()
                 .application_name("Tansu")
@@ -308,8 +330,17 @@ impl Ui {
         let source = gtk4::DragSource::new();
         source.set_actions(gdk::DragAction::COPY);
         let ui = self.clone();
-        source.connect_prepare(move |_s, _x, y| {
+        source.connect_prepare(move |s, x, y| {
             let row = ui.list.row_at_y(y as i32)?;
+            let (rx, ry) = ui
+                .list
+                .translate_coordinates(&row, x, y)
+                .unwrap_or((0.0, 0.0));
+            s.set_icon(
+                Some(&gtk4::WidgetPaintable::new(Some(&row))),
+                rx as i32,
+                ry as i32,
+            );
             let mut idx = if row.is_selected() {
                 ui.selected_indices()
             } else {
@@ -321,22 +352,52 @@ impl Ui {
                 .iter()
                 .filter_map(|&i| shelf.items.get(i).cloned())
                 .collect();
-            drag_provider(&items)
+            let provider = drag_provider(&items);
+            drop(shelf);
+            *ui.dragging.borrow_mut() = items;
+            provider
+        });
+        let ui = self.clone();
+        source.connect_drag_begin(move |_s, drag| {
+            let ui = ui.clone();
+            // Only fires when the receiver really took the data.
+            drag.connect_dnd_finished(move |_| {
+                let dragged = std::mem::take(&mut *ui.dragging.borrow_mut());
+                if !ui.remove_after_drag.get() || dragged.is_empty() {
+                    return;
+                }
+                let ui = ui.clone();
+                glib::idle_add_local_once(move || {
+                    {
+                        let mut shelf = ui.shelf.borrow_mut();
+                        for d in dragged {
+                            if let Some(pos) = shelf.items.iter().position(|i| *i == d) {
+                                shelf.items.remove(pos);
+                            }
+                        }
+                    }
+                    ui.persist();
+                    ui.refresh();
+                });
+            });
         });
         self.list.add_controller(source);
     }
 
-    fn restore_window_size(&self) {
+    fn restore_window_size(self: &Rc<Self>) {
         if let Ok(bytes) = std::fs::read(settings_path()) {
             if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&bytes) {
                 let w = v["width"].as_i64().unwrap_or(340).clamp(240, 4000) as i32;
                 let h = v["height"].as_i64().unwrap_or(520).clamp(240, 4000) as i32;
                 self.window.set_default_size(w, h);
+                if let Some(b) = v["remove_after_drag"].as_bool() {
+                    self.remove_after_drag.set(b);
+                }
             }
         }
     }
 
-    fn save_window_size_on_close(&self) {
+    fn save_window_size_on_close(self: &Rc<Self>) {
         self.window.connect_close_request(move |w| {
             let size =
                 serde_json::json!({ "width": w.default_width(), "height": w.default_height() });
@@ -414,6 +475,10 @@ impl ShelfWindow {
         edit.append(Some("Paste"), Some("win.paste"));
         edit.append(Some("Remove Selected"), Some("win.remove-selected"));
         edit.append(Some("Clear Shelf"), Some("win.clear"));
+        edit.append(
+            Some("Remove After Dragging Out"),
+            Some("win.remove-after-drag"),
+        );
         let app_section = gio::Menu::new();
         app_section.append(Some("About Tansu"), Some("win.about"));
         app_section.append(Some("Quit"), Some("app.quit"));
@@ -440,11 +505,13 @@ impl ShelfWindow {
             stack,
             shelf: RefCell::new(shelf),
             monitors: RefCell::new(Vec::new()),
+            dragging: RefCell::new(Vec::new()),
+            remove_after_drag: Cell::new(true),
         });
+        ui.restore_window_size();
         ui.install_actions();
         ui.install_drop_target(&toolbar);
         ui.install_drag_source();
-        ui.restore_window_size();
         ui.save_window_size_on_close();
         ui.refresh();
         Self { ui }
