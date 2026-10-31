@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use gtk4::prelude::*;
@@ -22,8 +23,71 @@ fn settings_path() -> PathBuf {
     config_dir().join("window.json")
 }
 
+fn export_dir() -> PathBuf {
+    glib::user_cache_dir().join("tansu").join("drag")
+}
+
+/// Loads the shelf. A damaged file is kept as `shelf.json.corrupt` instead
+/// of being overwritten, and files that are gone are dropped.
+fn load_shelf() -> Shelf {
+    let path = shelf_path();
+    match Shelf::load(&path) {
+        Ok(mut shelf) => {
+            shelf.items.retain(|i| match i {
+                // Keep items on drives that are merely not mounted right now.
+                ShelfItem::File { path } => {
+                    path.exists() || !path.parent().is_some_and(Path::exists)
+                }
+                _ => true,
+            });
+            shelf
+        }
+        Err(e) => {
+            eprintln!("tansu: could not read {}: {e}", path.display());
+            let _ = fs::rename(&path, path.with_extension("json.corrupt"));
+            Shelf::default()
+        }
+    }
+}
+
+/// Writes text and image items to temporary files so that folders and file
+/// managers, which only accept files, can receive them.
+fn export_to_files(items: &[ShelfItem]) -> Vec<gio::File> {
+    let dir = export_dir().join(glib::monotonic_time().to_string());
+    let mut out = Vec::new();
+    for item in items {
+        let Some(bytes) = item.payload() else {
+            continue;
+        };
+        if fs::create_dir_all(&dir).is_err() {
+            break;
+        }
+        let name = PathBuf::from(item.export_file_name());
+        let stem = name
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let ext = name.extension().map(|e| e.to_string_lossy().into_owned());
+        let mut path = dir.join(&name);
+        let mut n = 1;
+        while path.exists() {
+            n += 1;
+            path = dir.join(match &ext {
+                Some(ext) => format!("{stem} ({n}).{ext}"),
+                None => format!("{stem} ({n})"),
+            });
+        }
+        if fs::write(&path, bytes).is_ok() {
+            out.push(gio::File::for_path(path));
+        }
+    }
+    out
+}
+
 struct Ui {
     window: adw::ApplicationWindow,
+    toasts: adw::ToastOverlay,
     list: gtk4::ListBox,
     stack: gtk4::Stack,
     shelf: RefCell<Shelf>,
@@ -41,13 +105,14 @@ fn texture_item(tex: &gdk::Texture) -> Option<ShelfItem> {
 fn drag_provider(items: &[ShelfItem]) -> Option<gdk::ContentProvider> {
     let mut provs = Vec::new();
 
-    let files: Vec<gio::File> = items
+    let mut files: Vec<gio::File> = items
         .iter()
         .filter_map(|i| match i {
             ShelfItem::File { path } => Some(gio::File::for_path(path)),
             _ => None,
         })
         .collect();
+    files.extend(export_to_files(items));
     if !files.is_empty() {
         // Plain host-path URIs first, so file managers always get real paths.
         let uris: String = files.iter().map(|f| format!("{}\r\n", f.uri())).collect();
@@ -91,7 +156,9 @@ fn drag_provider(items: &[ShelfItem]) -> Option<gdk::ContentProvider> {
 
 impl Ui {
     fn persist(&self) {
-        let _ = self.shelf.borrow().save(shelf_path());
+        if let Err(e) = self.shelf.borrow().save(shelf_path()) {
+            eprintln!("tansu: could not save the shelf: {e}");
+        }
     }
 
     fn add(self: &Rc<Self>, items: Vec<ShelfItem>) {
@@ -248,6 +315,37 @@ impl Ui {
                 }
             });
         }
+    }
+
+    /// Double-click: open a file, or copy text/images back to the clipboard.
+    fn install_row_activation(self: &Rc<Self>) {
+        let ui = self.clone();
+        self.list.connect_row_activated(move |_, row| {
+            let item = ui.shelf.borrow().items.get(row.index() as usize).cloned();
+            let clipboard = ui.window.clipboard();
+            match item {
+                Some(ShelfItem::File { path }) => {
+                    let uri = gio::File::for_path(&path).uri();
+                    if let Err(e) =
+                        gio::AppInfo::launch_default_for_uri(&uri, gio::AppLaunchContext::NONE)
+                    {
+                        ui.toasts
+                            .add_toast(adw::Toast::new(&format!("Could not open: {e}")));
+                    }
+                }
+                Some(ShelfItem::Text { text }) => {
+                    clipboard.set_text(&text);
+                    ui.toasts.add_toast(adw::Toast::new("Text copied"));
+                }
+                Some(ShelfItem::Image { data, .. }) => {
+                    if let Ok(tex) = gdk::Texture::from_bytes(&glib::Bytes::from(&data[..])) {
+                        clipboard.set_texture(&tex);
+                        ui.toasts.add_toast(adw::Toast::new("Image copied"));
+                    }
+                }
+                None => {}
+            }
+        });
     }
 
     fn action(self: &Rc<Self>, name: &str, f: impl Fn(&Rc<Ui>) + 'static) {
@@ -469,6 +567,8 @@ impl ShelfWindow {
         let stack = gtk4::Stack::new();
         stack.add_named(&empty, Some("empty"));
         stack.add_named(&scrolled, Some("list"));
+        let toasts = adw::ToastOverlay::new();
+        toasts.set_child(Some(&stack));
 
         let menu = gio::Menu::new();
         let edit = gio::Menu::new();
@@ -495,12 +595,14 @@ impl ShelfWindow {
 
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&header);
-        toolbar.set_content(Some(&stack));
+        toolbar.set_content(Some(&toasts));
         window.set_content(Some(&toolbar));
 
-        let shelf = Shelf::load(shelf_path()).unwrap_or_default();
+        let shelf = load_shelf();
+        let _ = fs::remove_dir_all(export_dir());
         let ui = Rc::new(Ui {
             window,
+            toasts,
             list,
             stack,
             shelf: RefCell::new(shelf),
@@ -512,6 +614,7 @@ impl ShelfWindow {
         ui.install_actions();
         ui.install_drop_target(&toolbar);
         ui.install_drag_source();
+        ui.install_row_activation();
         ui.save_window_size_on_close();
         ui.refresh();
         Self { ui }

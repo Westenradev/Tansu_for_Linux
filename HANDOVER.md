@@ -58,22 +58,33 @@ flatpak run io.github.Westenradev.Tansu
 
 The `app` crate had never compiled until the last build attempt. The last error list had 19 errors. All were fixed in commit after `d7b7868`. The next Flatpak build must be run to confirm the app crate compiles. This was not yet verified.
 
-## Session 2 fixes
+## Current state (session 6)
 
-The app crate now compiles (checked against libadwaita 1.5 with `v1_5`; the real build needs 1.7). Fixed: `AboutDialog::present(Some(&win))`, `monitor_file` cancellable arg, 4-arg `connect_changed`, paste closure clone, per-item Remove. Tag `v0.1.0` points at old code, so use `io.github.Westenradev.Tansu.local.yml` (builds the local checkout) until a new tag is cut.
+Features that work (tested on X11 under Xvfb with a second GTK4 app as drag source/target):
 
-Session 3: image drop-in (gdk Texture to PNG, needs gtk4 feature `v4_6`) and a symbolic icon were added.
+- Drop files, text and images anywhere in the window. Paste with Ctrl+V.
+- Drag rows out. Files go out as paths. Text and images are also written to temp files in `$XDG_CACHE_HOME/tansu/drag/` so folders and file managers accept them. The temp dir is cleared at startup.
+- Remove-after-drag (menu toggle, default on) fires on `GdkDrag::dnd-finished`, so a cancelled drop keeps the item.
+- Double-click: opens a file, or copies text/image back to the clipboard.
+- Header bar with close button and menu. Ctrl+Q quits, Ctrl+W closes, Delete removes selection.
+- Image thumbnails. Empty-state page. Window size and the toggle persist in `window.json`.
+- Images are saved as base64 (the old number-array form still loads). A damaged `shelf.json` is renamed to `shelf.json.corrupt` instead of being overwritten. Missing files are dropped at startup unless their parent folder is missing (unmounted drive).
+- `tansu --float` uses layer-shell (Sway, Hyprland, KDE only; GNOME Mutter has no layer-shell).
+- Flatpak has `--filesystem=host:ro` so shelved files can be read and dragged out.
 
-Session 4: header bar with close button and menu, Ctrl+Q/Ctrl+W, empty-state page, image and file thumbnails, per-row remove button, paste of text/images/files, drop anywhere in the window, multi-item drag-out. Floating (layer-shell) mode is now opt-in with `tansu --float` and only works on compositors that support it (not GNOME).
+Checks: `cargo test -p tansu-core` (12 tests), `cargo clippy`, `cargo fmt --check`, `desktop-file-validate`, `appstreamcli validate --no-net`.
 
-Session 5: drag-out fix for Flatpak (`--filesystem=host:ro`), raw text/uri-list provider, drag icon, Yoink-style remove-after-drag (menu toggle, default on, uses GdkDrag dnd-finished). Tested on X11 with a second GTK4 app as drop target and as drag source.
+Build note: the app was only compile-checked against libadwaita 1.5 (`v1_5`). The real target is 1.7+ (`v1_7`), gtk4 feature `v4_8`. The real Flatpak build was run by the user.
+
+Use `io.github.Westenradev.Tansu.local.yml` to build the local checkout. The main manifest fetches git tag `v0.1.0`, which points at old code. Cut a new tag before Flathub.
 
 ## Remaining work
 
-1. Run the Flatpak build. Fix any remaining Rust errors.
-2. Add screenshots to the metainfo. Flathub requires them with captions.
-
-4. Per-item Remove in the context menu. Today Remove clears the whole shelf.
-
-6. Submit to Flathub. Needs public repo, tag, and screenshots.
-7. Test the RPM in COPR.
+1. Verify drag and drop on a real Wayland GNOME session (only X11 was simulated).
+2. Add screenshots with captions to the metainfo (Flathub requires them).
+3. Redraw the placeholder symbolic icon.
+4. Flathub: reviewers may question `host:ro`. A narrower option is portal-only access.
+5. App ID has uppercase letters (appstream pedantic note `cid-contains-uppercase-letter`). Decide before submitting.
+6. RPM: Fedora may lack packaged gtk4-rs 0.10 crates; COPR will need vendored sources. Untested.
+7. Thumbnails are decoded on every refresh. Cache them if shelves get large.
+8. Submit to Flathub: needs public repo, new tag, screenshots.

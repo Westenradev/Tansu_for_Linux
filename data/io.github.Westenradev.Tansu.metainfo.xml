@@ -20,7 +20,7 @@
     </ul>
   </description>
   <launchable type="desktop-id">io.github.Westenradev.Tansu.desktop</launchable>
-  <developer id="io.github.Westenradev">
+  <developer id="io.github.westenradev">
     <name>Westenradev</name>
   </developer>
   <releases>
@@ -32,5 +32,6 @@
   </releases>
   <content_rating type="oars-1.1"/>
   <url type="homepage">https://github.com/Westenradev/Tansu_for_Linux</url>
+  <url type="bugtracker">https://github.com/Westenradev/Tansu_for_Linux/issues</url>
   <url type="vcs-browser">https://github.com/Westenradev/Tansu_for_Linux</url>
 </component>
