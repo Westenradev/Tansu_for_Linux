@@ -62,12 +62,14 @@ The `app` crate had never compiled until the last build attempt. The last error 
 
 The app crate now compiles (checked against libadwaita 1.5 with `v1_5`; the real build needs 1.7). Fixed: `AboutDialog::present(Some(&win))`, `monitor_file` cancellable arg, 4-arg `connect_changed`, paste closure clone, per-item Remove. Tag `v0.1.0` points at old code, so use `io.github.Westenradev.Tansu.local.yml` (builds the local checkout) until a new tag is cut.
 
+Session 3: image drop-in (gdk Texture to PNG, needs gtk4 feature `v4_6`) and a symbolic icon were added.
+
 ## Remaining work
 
 1. Run the Flatpak build. Fix any remaining Rust errors.
 2. Add screenshots to the metainfo. Flathub requires them with captions.
-3. Add a symbolic icon in `data/icons/hicolor/symbolic/apps/`.
+
 4. Per-item Remove in the context menu. Today Remove clears the whole shelf.
-5. Image drop-in is not wired. Only files and text drop in.
+
 6. Submit to Flathub. Needs public repo, tag, and screenshots.
 7. Test the RPM in COPR.

@@ -35,6 +35,7 @@ modules:
       - install -Dm644 data/io.github.Westenradev.Tansu.desktop /app/share/applications/io.github.Westenradev.Tansu.desktop
       - install -Dm644 data/io.github.Westenradev.Tansu.metainfo.xml /app/share/metainfo/io.github.Westenradev.Tansu.metainfo.xml
       - install -Dm644 data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg /app/share/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+      - install -Dm644 data/icons/hicolor/symbolic/apps/io.github.Westenradev.Tansu-symbolic.svg /app/share/icons/hicolor/symbolic/apps/io.github.Westenradev.Tansu-symbolic.svg
     sources:
       - type: dir
         path: .
@@ -44,4 +45,6 @@ modules:
         path: data/io.github.Westenradev.Tansu.metainfo.xml
       - type: file
         path: data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+      - type: file
+        path: data/icons/hicolor/symbolic/apps/io.github.Westenradev.Tansu-symbolic.svg
       - cargo-sources.json

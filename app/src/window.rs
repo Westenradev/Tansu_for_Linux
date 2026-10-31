@@ -158,6 +158,27 @@ impl ShelfWindow {
             false
         });
         self.list.add_controller(text_target);
+
+        let image_target = gtk4::DropTarget::new(
+            gtk4::gdk::Texture::static_type(),
+            gtk4::gdk::DragAction::COPY,
+        );
+        let state = self.state.clone();
+        let list = self.list.clone();
+        image_target.connect_drop(move |_t, value, _x, _y| {
+            if let Ok(texture) = value.get::<gtk4::gdk::Texture>() {
+                let bytes = texture.save_to_png_bytes();
+                if let Some(item) = ShelfItem::image("image/png", bytes.to_vec()) {
+                    state.borrow_mut().shelf.items.push(item);
+                    let shelf = state.borrow().shelf.clone();
+                    let _ = shelf.save(shelf_path());
+                    reload(&list, &state);
+                    return true;
+                }
+            }
+            false
+        });
+        self.list.add_controller(image_target);
     }
 
     fn install_drag_source(&self) {
