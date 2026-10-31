@@ -82,6 +82,7 @@ impl ShelfWindow {
         this.reload_rows();
         this.install_drop_target();
         this.install_drag_source();
+        this.install_context_menu();
         this.watch_files();
         this.restore_window_size();
         this.save_window_size_on_close();
@@ -184,6 +185,80 @@ impl ShelfWindow {
             Some(gdk4::ContentProvider::for_value(&value))
         });
         self.list.add_controller(source);
+    }
+
+    fn install_context_menu(&self) {
+        let gesture = gtk4::GestureClick::builder().button(3).build();
+        let state = self.state.clone();
+        let list = self.list.clone();
+        let window = self.window.clone();
+        gesture.connect_released(move |g, _n, x, y| {
+            let menu = gio::Menu::new();
+            menu.append(Some("Remove"), Some("win.remove"));
+            menu.append(Some("Clear shelf"), Some("win.clear"));
+            menu.append(Some("Paste"), Some("win.paste"));
+            menu.append(Some("About Tansu"), Some("win.about"));
+            let popover = gtk4::PopoverMenu::builder()
+                .menu_model(&menu)
+                .pointing_to(&gtk4::gdk::Rectangle::new(x as i32, y as i32, 1, 1))
+                .build();
+            popover.set_parent(&g.widget().unwrap());
+
+            let group = gio::SimpleActionGroup::new();
+            let remove = gio::SimpleAction::new("remove", None);
+            let clear = gio::SimpleAction::new("clear", None);
+            let paste = gio::SimpleAction::new("paste", None);
+            let about = gio::SimpleAction::new("about", None);
+            let st_r = state.clone();
+            let ls_r = list.clone();
+            remove.connect_activate(move |_, _| {
+                st_r.borrow_mut().shelf.items.clear();
+                let shelf = st_r.borrow().shelf.clone();
+                let _ = shelf.save(shelf_path());
+                reload(&ls_r, &st_r);
+            });
+            let st_c = state.clone();
+            let ls_c = list.clone();
+            clear.connect_activate(move |_, _| {
+                st_c.borrow_mut().shelf.items.clear();
+                let shelf = st_c.borrow().shelf.clone();
+                let _ = shelf.save(shelf_path());
+                reload(&ls_c, &st_c);
+            });
+            let st_p = state.clone();
+            let ls_p = list.clone();
+            paste.connect_activate(move |_, _| {
+                let clip = gtk4::prelude::WidgetExt::display(&ls_p).default_clipboard();
+                clip.connect_text_received(move |_c, text| {
+                    if let Some(text) = text {
+                        if let Some(item) = ShelfItem::text(text.to_string()) {
+                            st_p.borrow_mut().shelf.items.push(item);
+                            let shelf = st_p.borrow().shelf.clone();
+                            let _ = shelf.save(shelf_path());
+                            reload(&ls_p, &st_p);
+                        }
+                    }
+                });
+            });
+            let w_a = window.clone();
+            about.connect_activate(move |_, _| {
+                let dlg = libadwaita::AboutDialog::builder()
+                    .application_name("Tansu")
+                    .version("0.1.0")
+                    .license_type(gtk4::License::MitX11)
+                    .website("https://github.com/Westenradev/Tansu_for_Linux")
+                    .build();
+                dlg.set_transient_for(Some(&w_a));
+                dlg.present();
+            });
+            group.add_action(&remove);
+            group.add_action(&clear);
+            group.add_action(&paste);
+            group.add_action(&about);
+            window.insert_action_group("win", Some(&group));
+            popover.popup();
+        });
+        self.list.add_controller(gesture);
     }
 
     fn watch_files(&self) {
