@@ -49,6 +49,7 @@ impl ShelfWindow {
             .default_width(320)
             .default_height(480)
             .build();
+        Self::try_layer_shell(&window);
 
         let list = gtk4::ListBox::builder()
             .selection_mode(gtk4::SelectionMode::Multiple)
@@ -87,6 +88,23 @@ impl ShelfWindow {
         this.restore_window_size();
         this.save_window_size_on_close();
         this
+    }
+
+    #[cfg(all(target_os = "linux", feature = "layer-shell"))]
+    fn try_layer_shell(window: &libadwaita::ApplicationWindow) {
+        if gtk4_layer_shell::is_supported() {
+            gtk4_layer_shell::init_for_window(window.upcast_ref());
+            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Right, true);
+            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Top, true);
+            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Bottom, true);
+            gtk4_layer_shell::set_layer(window.upcast_ref(), gtk4_layer_shell::Layer::Top);
+            gtk4_layer_shell::auto_exclusive_zone_enable(window.upcast_ref());
+        }
+    }
+
+    #[cfg(not(all(target_os = "linux", feature = "layer-shell")))]
+    fn try_layer_shell(_window: &libadwaita::ApplicationWindow) {
+        _window.set_always_on_top(true);
     }
 
     pub fn present(&self) {
