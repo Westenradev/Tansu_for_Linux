@@ -81,6 +81,7 @@ impl ShelfWindow {
         };
         this.reload_rows();
         this.install_drop_target();
+        this.install_drag_source();
         this.watch_files();
         this.restore_window_size();
         this.save_window_size_on_close();
@@ -144,6 +145,45 @@ impl ShelfWindow {
             false
         });
         self.list.add_controller(text_target);
+    }
+
+    fn install_drag_source(&self) {
+        let source = gtk4::DragSource::new();
+        source.set_actions(gdk4::DragAction::COPY);
+        let state = self.state.clone();
+        source.connect_prepare(move |_s, x, y| {
+            let st = state.borrow();
+            if st.shelf.items.is_empty() {
+                return None;
+            }
+            let items = st.shelf.items.clone();
+            drop(st);
+            let files: Vec<gio::File> = items
+                .iter()
+                .filter_map(|i| match i {
+                    ShelfItem::File { path } => gio::File::for_path(path).ok(),
+                    _ => None,
+                })
+                .collect();
+            let value = if !files.is_empty() {
+                glib::Value::from(&files)
+            } else if let Some(item) = items.first() {
+                match item {
+                    ShelfItem::Text { text } => glib::Value::from(text.as_str()),
+                    ShelfItem::Image { mime, data } => {
+                        let provider =
+                            gdk4::ContentProvider::for_bytes(mime, &glib::Bytes::from(data));
+                        return Some(provider);
+                    }
+                    ShelfItem::File { .. } => unreachable!(),
+                }
+            } else {
+                return None;
+            };
+            let _ = (x, y);
+            Some(gdk4::ContentProvider::for_value(&value))
+        });
+        self.list.add_controller(source);
     }
 
     fn watch_files(&self) {
