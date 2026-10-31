@@ -2,13 +2,8 @@ app-id: io.github.Westenradev.Tansu
 runtime: org.gnome.Platform
 runtime-version: "51"
 sdk: org.gnome.Sdk
-
-add-extensions:
-  org.freedesktop.Sdk.Extension.rust-stable:
-    version: "25.08"
-    directory: rust-stable
-    no-autodownload: false
-    autodelete: true
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
 
 command: tansu
 
