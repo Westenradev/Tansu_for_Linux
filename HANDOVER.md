@@ -58,6 +58,10 @@ flatpak run io.github.Westenradev.Tansu
 
 The `app` crate had never compiled until the last build attempt. The last error list had 19 errors. All were fixed in commit after `d7b7868`. The next Flatpak build must be run to confirm the app crate compiles. This was not yet verified.
 
+## Session 2 fixes
+
+The app crate now compiles (checked against libadwaita 1.5 with `v1_5`; the real build needs 1.7). Fixed: `AboutDialog::present(Some(&win))`, `monitor_file` cancellable arg, 4-arg `connect_changed`, paste closure clone, per-item Remove. Tag `v0.1.0` points at old code, so use `io.github.Westenradev.Tansu.local.yml` (builds the local checkout) until a new tag is cut.
+
 ## Remaining work
 
 1. Run the Flatpak build. Fix any remaining Rust errors.

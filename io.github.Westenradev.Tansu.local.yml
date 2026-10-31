@@ -1,0 +1,47 @@
+app-id: io.github.Westenradev.Tansu
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+
+command: tansu
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --talk-name=org.freedesktop.Notifications
+  - --filesystem=xdg-config/tansu:create
+
+modules:
+  - name: gtk4-layer-shell
+    buildsystem: meson
+    sources:
+      - type: git
+        url: https://github.com/wmww/gtk4-layer-shell.git
+        tag: v1.2.0
+
+  - name: tansu
+    buildsystem: simple
+    build-commands:
+      - mkdir -p .cargo
+      - printf '[source.crates-io]\nreplace-with = "vendored-sources"\n\n[source.vendored-sources]\ndirectory = "cargo/vendor"\n' > .cargo/config.toml
+      - cargo build --release --offline --features layer-shell
+      - install -Dm755 target/release/tansu /app/bin/tansu
+      - install -Dm644 data/io.github.Westenradev.Tansu.desktop /app/share/applications/io.github.Westenradev.Tansu.desktop
+      - install -Dm644 data/io.github.Westenradev.Tansu.metainfo.xml /app/share/metainfo/io.github.Westenradev.Tansu.metainfo.xml
+      - install -Dm644 data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg /app/share/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+    sources:
+      - type: dir
+        path: .
+      - type: file
+        path: data/io.github.Westenradev.Tansu.desktop
+      - type: file
+        path: data/io.github.Westenradev.Tansu.metainfo.xml
+      - type: file
+        path: data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+      - cargo-sources.json

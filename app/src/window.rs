@@ -120,11 +120,6 @@ impl ShelfWindow {
         }
     }
 
-    fn save(&self) {
-        let shelf = self.state.borrow().shelf.clone();
-        let _ = shelf.save(shelf_path());
-    }
-
     fn install_drop_target(&self) {
         let target = gtk4::DropTarget::new(gio::File::static_type(), gtk4::gdk::DragAction::COPY);
         target.set_types(&[gio::File::static_type()]);
@@ -237,7 +232,17 @@ impl ShelfWindow {
             let st_r = state.clone();
             let ls_r = list.clone();
             remove.connect_activate(move |_, _| {
-                st_r.borrow_mut().shelf.items.clear();
+                let mut idx: Vec<usize> = ls_r
+                    .selected_rows()
+                    .iter()
+                    .map(|r| r.index() as usize)
+                    .collect();
+                idx.sort_unstable_by(|a, b| b.cmp(a));
+                for i in idx {
+                    if i < st_r.borrow().shelf.items.len() {
+                        st_r.borrow_mut().shelf.items.remove(i);
+                    }
+                }
                 let shelf = st_r.borrow().shelf.clone();
                 let _ = shelf.save(shelf_path());
                 reload(&ls_r, &st_r);
@@ -255,6 +260,8 @@ impl ShelfWindow {
             paste.connect_activate(move |_, _| {
                 let display = ls_p.display();
                 let clip = display.clipboard();
+                let st_p = st_p.clone();
+                let ls_p = ls_p.clone();
                 clip.read_text_async(gio::Cancellable::NONE, move |res| {
                     if let Ok(Some(text)) = res {
                         if let Some(item) = ShelfItem::text(text.to_string()) {
@@ -274,8 +281,7 @@ impl ShelfWindow {
                     .license_type(gtk4::License::MitX11)
                     .website("https://github.com/Westenradev/Tansu_for_Linux")
                     .build();
-                dlg.set_transient_for(Some(&w_a));
-                dlg.present();
+                dlg.present(Some(&w_a));
             });
             group.add_action(&remove);
             group.add_action(&clear);
@@ -294,12 +300,11 @@ impl ShelfWindow {
             if let ShelfItem::File { path } = item {
                 let file = gio::File::for_path(&path);
                 if let Ok(monitor) =
-                    file.monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE.as_ref())
+                    file.monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE)
                 {
                     let state = self.state.clone();
                     let list = self.list.clone();
-                    monitor.connect_changed(move |m, f, _e| {
-                        let _ = m;
+                    monitor.connect_changed(move |_m, f, _other, _e| {
                         if let Some(p) = f.path() {
                             let mut st = state.borrow_mut();
                             if let Some(item) = st
