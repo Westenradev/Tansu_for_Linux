@@ -24,7 +24,6 @@ modules:
       - type: git
         url: https://github.com/Westenradev/Tansu_for_Linux.git
         tag: v0.1.0
-        branch: main
       - type: file
         path: data/io.github.Westenradev.Tansu.desktop
       - type: file
