@@ -64,6 +64,8 @@ The app crate now compiles (checked against libadwaita 1.5 with `v1_5`; the real
 
 Session 3: image drop-in (gdk Texture to PNG, needs gtk4 feature `v4_6`) and a symbolic icon were added.
 
+Session 4: header bar with close button and menu, Ctrl+Q/Ctrl+W, empty-state page, image and file thumbnails, per-row remove button, paste of text/images/files, drop anywhere in the window, multi-item drag-out. Floating (layer-shell) mode is now opt-in with `tansu --float` and only works on compositors that support it (not GNOME).
+
 ## Remaining work
 
 1. Run the Flatpak build. Fix any remaining Rust errors.
