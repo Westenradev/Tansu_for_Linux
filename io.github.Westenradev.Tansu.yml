@@ -28,6 +28,7 @@ modules:
   - name: tansu
     buildsystem: simple
     build-commands:
+      - mkdir -p .cargo
       - printf '[source.crates-io]\nreplace-with = "vendored-sources"\n\n[source.vendored-sources]\ndirectory = "cargo/vendor"\n' > .cargo/config.toml
       - cargo build --release --offline --features layer-shell
       - install -Dm755 target/release/tansu /app/bin/tansu
