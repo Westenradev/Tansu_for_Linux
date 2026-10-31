@@ -6,8 +6,7 @@ sdk: org.gnome.Sdk
 add-extensions:
   org.freedesktop.Sdk.Extension.rust-stable:
     version: "25.08"
-    directory: rust
-    merge-dirs: bin;lib;share
+    directory: rust-stable
     no-autodownload: false
     autodelete: true
 
