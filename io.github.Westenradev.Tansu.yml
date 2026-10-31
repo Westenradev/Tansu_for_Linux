@@ -2,6 +2,15 @@ app-id: io.github.Westenradev.Tansu
 runtime: org.gnome.Platform
 runtime-version: "51"
 sdk: org.gnome.Sdk
+
+add-extensions:
+  org.freedesktop.Sdk.Extension.rust-stable:
+    version: "25.08"
+    directory: rust
+    merge-dirs: bin;lib;share
+    no-autodownload: false
+    autodelete: true
+
 command: tansu
 
 finish-args:
@@ -12,6 +21,13 @@ finish-args:
   - --filesystem=xdg-config/tansu:create
 
 modules:
+  - name: gtk4-layer-shell
+    buildsystem: meson
+    sources:
+      - type: git
+        url: https://github.com/wmww/gtk4-layer-shell.git
+        tag: v1.2.0
+
   - name: tansu
     buildsystem: simple
     build-commands:
