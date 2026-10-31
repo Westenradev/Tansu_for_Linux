@@ -93,12 +93,12 @@ impl ShelfWindow {
     #[cfg(all(target_os = "linux", feature = "layer-shell"))]
     fn try_layer_shell(window: &libadwaita::ApplicationWindow) {
         if gtk4_layer_shell::is_supported() {
-            gtk4_layer_shell::init_for_window(window.upcast_ref());
-            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Right, true);
-            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Top, true);
-            gtk4_layer_shell::set_anchor(window.upcast_ref(), gtk4_layer_shell::Edge::Bottom, true);
-            gtk4_layer_shell::set_layer(window.upcast_ref(), gtk4_layer_shell::Layer::Top);
-            gtk4_layer_shell::auto_exclusive_zone_enable(window.upcast_ref());
+            gtk4_layer_shell::init_for_window(window);
+            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Right, true);
+            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Top, true);
+            gtk4_layer_shell::set_anchor(window, gtk4_layer_shell::Edge::Bottom, true);
+            gtk4_layer_shell::set_layer(window, gtk4_layer_shell::Layer::Top);
+            gtk4_layer_shell::auto_exclusive_zone_enable(window);
         }
     }
 
@@ -126,12 +126,12 @@ impl ShelfWindow {
     }
 
     fn install_drop_target(&self) {
-        let target = gtk4::DropTarget::new(gio::File::static_type(), gdk4::DragAction::COPY);
+        let target = gtk4::DropTarget::new(gio::File::static_type(), gtk4::gdk::DragAction::COPY);
         target.set_types(&[gio::File::static_type()]);
         let state = self.state.clone();
         let list = self.list.clone();
         target.connect_drop(move |_t, value, _x, _y| {
-            if let Some(file) = value.get::<gio::File>() {
+            if let Ok(file) = value.get::<gio::File>() {
                 if let Some(path) = file.path() {
                     if let Some(item) = ShelfItem::file(&path) {
                         state.borrow_mut().shelf.items.push(item);
@@ -146,11 +146,12 @@ impl ShelfWindow {
         });
         self.list.add_controller(target);
 
-        let text_target = gtk4::DropTarget::new(glib::types::Type::STRING, gdk4::DragAction::COPY);
+        let text_target =
+            gtk4::DropTarget::new(glib::types::Type::STRING, gtk4::gdk::DragAction::COPY);
         let state = self.state.clone();
         let list = self.list.clone();
         text_target.connect_drop(move |_t, value, _x, _y| {
-            if let Some(text) = value.get::<String>() {
+            if let Ok(text) = value.get::<String>() {
                 if let Some(item) = ShelfItem::text(text) {
                     state.borrow_mut().shelf.items.push(item);
                     let shelf = state.borrow().shelf.clone();
@@ -166,7 +167,7 @@ impl ShelfWindow {
 
     fn install_drag_source(&self) {
         let source = gtk4::DragSource::new();
-        source.set_actions(gdk4::DragAction::COPY);
+        source.set_actions(gtk4::gdk::DragAction::COPY);
         let state = self.state.clone();
         source.connect_prepare(move |_s, x, y| {
             let st = state.borrow();
@@ -178,25 +179,27 @@ impl ShelfWindow {
             let files: Vec<gio::File> = items
                 .iter()
                 .filter_map(|i| match i {
-                    ShelfItem::File { path } => gio::File::for_path(path).ok(),
+                    ShelfItem::File { path } => Some(gio::File::for_path(path)),
                     _ => None,
                 })
                 .collect();
             let _ = (x, y);
             if !files.is_empty() {
-                let providers: Vec<gdk4::ContentProvider> = files
+                let providers: Vec<gtk4::gdk::ContentProvider> = files
                     .iter()
-                    .map(|f| gdk4::ContentProvider::for_value(&f.to_value()))
+                    .map(|f| gtk4::gdk::ContentProvider::for_value(&f.to_value()))
                     .collect();
-                return Some(gdk4::ContentProvider::new_union(&providers));
+                return Some(gtk4::gdk::ContentProvider::new_union(&providers));
             }
             if let Some(item) = items.first() {
                 match item {
                     ShelfItem::Text { text } => {
-                        return Some(gdk4::ContentProvider::for_value(&text.as_str().to_value()))
+                        return Some(gtk4::gdk::ContentProvider::for_value(
+                            &text.as_str().to_value(),
+                        ))
                     }
                     ShelfItem::Image { mime, data } => {
-                        return Some(gdk4::ContentProvider::for_bytes(
+                        return Some(gtk4::gdk::ContentProvider::for_bytes(
                             mime,
                             &glib::Bytes::from(&data[..]),
                         ));
@@ -289,33 +292,33 @@ impl ShelfWindow {
         let items = self.state.borrow().shelf.items.clone();
         for item in items {
             if let ShelfItem::File { path } = item {
-                if let Ok(file) = gio::File::for_path(&path) {
-                    if let Ok(monitor) = file
-                        .monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE.as_ref())
-                    {
-                        let state = self.state.clone();
-                        let list = self.list.clone();
-                        monitor.connect_changed(move |m, f, _e| {
-                            let _ = m;
-                            if let Some(p) = f.path() {
-                                let mut st = state.borrow_mut();
-                                if let Some(item) =
-                                    st.shelf.items.iter_mut().find(
-                                        |i| matches!(i, ShelfItem::File { path } if *path == p),
-                                    )
-                                {
-                                    *item = ShelfItem::File { path: p.clone() };
-                                } else if !p.exists() {
-                                    st.shelf.items.retain(
-                                        |i| !matches!(i, ShelfItem::File { path } if *path == p),
-                                    );
-                                    drop(st);
-                                    reload(&list, &state);
-                                }
+                let file = gio::File::for_path(&path);
+                if let Ok(monitor) =
+                    file.monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE.as_ref())
+                {
+                    let state = self.state.clone();
+                    let list = self.list.clone();
+                    monitor.connect_changed(move |m, f, _e| {
+                        let _ = m;
+                        if let Some(p) = f.path() {
+                            let mut st = state.borrow_mut();
+                            if let Some(item) = st
+                                .shelf
+                                .items
+                                .iter_mut()
+                                .find(|i| matches!(i, ShelfItem::File { path } if *path == p))
+                            {
+                                *item = ShelfItem::File { path: p.clone() };
+                            } else if !p.exists() {
+                                st.shelf.items.retain(
+                                    |i| !matches!(i, ShelfItem::File { path } if *path == p),
+                                );
+                                drop(st);
+                                reload(&list, &state);
                             }
-                        });
-                        monitors.push(monitor);
-                    }
+                        }
+                    });
+                    monitors.push(monitor);
                 }
             }
         }

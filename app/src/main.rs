@@ -2,7 +2,6 @@ mod rows;
 mod window;
 
 use gtk4::prelude::*;
-use libadwaita::prelude::*;
 
 fn main() {
     let app = libadwaita::Application::builder()
