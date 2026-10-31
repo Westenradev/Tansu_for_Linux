@@ -28,7 +28,10 @@ modules:
   - name: tansu
     buildsystem: simple
     build-commands:
-      - cargo build --release --features layer-shell
+      - mkdir -p .cargo
+      - echo '[source.crates-io] replace-with = "vendored-sources"' >> .cargo/config.toml
+      - echo '[source.vendored-sources] directory = "cargo/vendor"' >> .cargo/config.toml
+      - cargo build --release --offline --features layer-shell
       - install -Dm755 target/release/tansu /app/bin/tansu
       - install -Dm644 data/io.github.Westenradev.Tansu.desktop /app/share/applications/io.github.Westenradev.Tansu.desktop
       - install -Dm644 data/io.github.Westenradev.Tansu.metainfo.xml /app/share/metainfo/io.github.Westenradev.Tansu.metainfo.xml
