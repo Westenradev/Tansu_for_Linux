@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Tansu
+Comment=A floating shelf for files, text and images
+Exec=tansu
+Icon=io.github.Westenradev.Tansu
+Terminal=false
+Type=Application
+Categories=Utility;GTK;
+Keywords=shelf;clipboard;drag;drop;parking;
+StartupNotify=true

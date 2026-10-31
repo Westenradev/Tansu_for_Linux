@@ -1,0 +1,33 @@
+app-id: io.github.Westenradev.Tansu
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: tansu
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --talk-name=org.freedesktop.Notifications
+  - --filesystem=xdg-config/tansu:create
+
+modules:
+  - name: tansu
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --features layer-shell
+      - install -Dm755 target/release/tansu /app/bin/tansu
+      - install -Dm644 data/io.github.Westenradev.Tansu.desktop /app/share/applications/io.github.Westenradev.Tansu.desktop
+      - install -Dm644 data/io.github.Westenradev.Tansu.metainfo.xml /app/share/metainfo/io.github.Westenradev.Tansu.metainfo.xml
+      - install -Dm644 data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg /app/share/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+    sources:
+      - type: git
+        url: https://github.com/Westenradev/Tansu_for_Linux.git
+        tag: v0.1.0
+      - type: file
+        path: data/io.github.Westenradev.Tansu.desktop
+      - type: file
+        path: data/io.github.Westenradev.Tansu.metainfo.xml
+      - type: file
+        path: data/icons/hicolor/scalable/apps/io.github.Westenradev.Tansu.svg
+      - cargo-sources.json

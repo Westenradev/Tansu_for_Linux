@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.Westenradev.Tansu</id>
+  <name>Tansu</name>
+  <summary>A floating shelf for files, text and images</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Tansu is a small floating shelf window where you temporarily park files,
+      text snippets and images during drag-and-drop, so you can navigate freely
+      between windows and workspaces before dropping the items at their final
+      destination.
+    </p>
+    <ul>
+      <li>Drop files, text and images onto the shelf</li>
+      <li>Drag items back out to any app that accepts them</li>
+      <li>Files are followed when renamed or moved, and removed when deleted</li>
+      <li>The shelf survives restarts</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.Westenradev.Tansu.desktop</launchable>
+  <developer id="io.github.Westenradev">
+    <name>Westenradev</name>
+  </developer>
+  <releases>
+    <release version="0.1.0" date="2026-10-31">
+      <description>
+        <p>Initial Linux release.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1"/>
+  <url type="homepage">https://github.com/Westenradev/Tansu_for_Linux</url>
+  <url type="vcs-browser">https://github.com/Westenradev/Tansu_for_Linux</url>
+</component>
