@@ -103,9 +103,7 @@ impl ShelfWindow {
     }
 
     #[cfg(not(all(target_os = "linux", feature = "layer-shell")))]
-    fn try_layer_shell(_window: &libadwaita::ApplicationWindow) {
-        _window.set_always_on_top(true);
-    }
+    fn try_layer_shell(_window: &libadwaita::ApplicationWindow) {}
 
     pub fn present(&self) {
         self.window.present();
@@ -184,23 +182,29 @@ impl ShelfWindow {
                     _ => None,
                 })
                 .collect();
-            let value = if !files.is_empty() {
-                glib::Value::from(&files)
-            } else if let Some(item) = items.first() {
+            let _ = (x, y);
+            if !files.is_empty() {
+                let providers: Vec<gdk4::ContentProvider> = files
+                    .iter()
+                    .map(|f| gdk4::ContentProvider::for_value(&f.to_value()))
+                    .collect();
+                return Some(gdk4::ContentProvider::new_union(&providers));
+            }
+            if let Some(item) = items.first() {
                 match item {
-                    ShelfItem::Text { text } => glib::Value::from(text.as_str()),
+                    ShelfItem::Text { text } => {
+                        return Some(gdk4::ContentProvider::for_value(&text.as_str().to_value()))
+                    }
                     ShelfItem::Image { mime, data } => {
-                        let provider =
-                            gdk4::ContentProvider::for_bytes(mime, &glib::Bytes::from(data));
-                        return Some(provider);
+                        return Some(gdk4::ContentProvider::for_bytes(
+                            mime,
+                            &glib::Bytes::from(&data[..]),
+                        ));
                     }
                     ShelfItem::File { .. } => unreachable!(),
                 }
-            } else {
-                return None;
-            };
-            let _ = (x, y);
-            Some(gdk4::ContentProvider::for_value(&value))
+            }
+            None
         });
         self.list.add_controller(source);
     }
@@ -246,9 +250,10 @@ impl ShelfWindow {
             let st_p = state.clone();
             let ls_p = list.clone();
             paste.connect_activate(move |_, _| {
-                let clip = gtk4::prelude::WidgetExt::display(&ls_p).default_clipboard();
-                clip.connect_text_received(move |_c, text| {
-                    if let Some(text) = text {
+                let display = ls_p.display();
+                let clip = display.clipboard();
+                clip.read_text_async(gio::Cancellable::NONE, move |res| {
+                    if let Ok(Some(text)) = res {
                         if let Some(item) = ShelfItem::text(text.to_string()) {
                             st_p.borrow_mut().shelf.items.push(item);
                             let shelf = st_p.borrow().shelf.clone();
